@@ -48,22 +48,35 @@ app.post('/webhook', async (req, res) => {
   } catch {
     return res.status(400).send('Malformed JSON');
   }
-  if (
-    body &&
-    body.action === 'created' &&
-    body.repository
-  ) {
+  if (body && body.repository) {
     const repo = body.repository;
-    const info = {
-      name: repo.name,
-      description: repo.description || '',
-      yearCreated: new Date(repo.created_at).getFullYear(),
-      imageUrl: repo.owner.avatar_url,
-      htmlUrl: repo.html_url,
-      topics: Array.isArray(repo.topics) ? repo.topics : [],
-    };
-    await repos.insertOne(info);
-    return res.status(200).send('Repository info saved!');
+    if (body.action === 'created') {
+      const info = {
+        name: repo.name,
+        description: repo.description || '',
+        yearCreated: new Date(repo.created_at).getFullYear(),
+        imageUrl: repo.owner.avatar_url,
+        htmlUrl: repo.html_url,
+        topics: Array.isArray(repo.topics) ? repo.topics : [],
+      };
+      await repos.insertOne(info);
+      return res.status(200).send('Repository info saved!');
+    } else if (body.action === 'deleted') {
+      await repos.deleteOne({ name: repo.name });
+      return res.status(200).send('Repository deleted from DB!');
+    } else if (body.action === 'edited') {
+      // Update the repository info in the DB
+      const update = {
+        $set: {
+          description: repo.description || '',
+          imageUrl: repo.owner.avatar_url,
+          htmlUrl: repo.html_url,
+          topics: Array.isArray(repo.topics) ? repo.topics : [],
+        }
+      };
+      await repos.updateOne({ name: repo.name }, update);
+      return res.status(200).send('Repository info updated!');
+    }
   }
   res.status(200).send('Ignored');
 });
